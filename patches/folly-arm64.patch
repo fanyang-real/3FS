@@ -1,5 +1,5 @@
 diff --git a/folly/experimental/StampedPtr.h b/folly/experimental/StampedPtr.h
-index 668649e2c..e19ec1222 100644
+index 668649e..e19ec12 100644
 --- a/folly/experimental/StampedPtr.h
 +++ b/folly/experimental/StampedPtr.h
 @@ -85,8 +85,15 @@ struct StampedPtr {
@@ -19,23 +19,29 @@ index 668649e2c..e19ec1222 100644
  
    static uint16_t unpackStamp(uint64_t raw) {
 diff --git a/folly/hash/Checksum.cpp b/folly/hash/Checksum.cpp
-index 5d134821f..986c61e60 100644
+index 5d13482..94159e5 100644
 --- a/folly/hash/Checksum.cpp
 +++ b/folly/hash/Checksum.cpp
-@@ -87,7 +87,11 @@ uint32_t crc32_hw(
- }
+@@ -132,11 +132,17 @@ uint32_t crc32_sw(
+ } // namespace detail
  
- bool crc32c_hw_supported() {
+ uint32_t crc32c(const uint8_t* data, size_t nbytes, uint32_t startingChecksum) {
 +#if defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-+  return true;
++  // ARMv8 CRC32 instructions. crc32c_hw_supported() stays false here because
++  // crc32c_combine() keys off it and its hardware combiner is x86-only.
++  return detail::crc32c_hw(data, nbytes, startingChecksum);
 +#else
-   return false;
+   if (detail::crc32c_hw_supported()) {
+     return detail::crc32c_hw(data, nbytes, startingChecksum);
+   } else {
+     return detail::crc32c_sw(data, nbytes, startingChecksum);
+   }
 +#endif
  }
  
- bool crc32_hw_supported() {
+ uint32_t crc32(const uint8_t* data, size_t nbytes, uint32_t startingChecksum) {
 diff --git a/folly/hash/detail/Crc32cDetail.cpp b/folly/hash/detail/Crc32cDetail.cpp
-index ada6ac20c..bc6e6f8a5 100644
+index ada6ac2..bc6e6f8 100644
 --- a/folly/hash/detail/Crc32cDetail.cpp
 +++ b/folly/hash/detail/Crc32cDetail.cpp
 @@ -38,6 +38,11 @@
